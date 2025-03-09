@@ -1,38 +1,49 @@
-# Ad Impression Counter Service
+# Ads Impression Counter Service
 
-This repository contains an **in-memory concurrent service** for tracking ad impressions in real-time. The service:
+This repository contains an **in-memory concurrent service** for tracking ad impressions in real-time. The service provides:
 
-- **Registers advertising campaigns** (with name and start time)
-- **Tracks impressions** for each campaign
-- **Handles duplicate impressions** via a TTL mechanism
-- **Provides stats** (LastHour, LastDay, TotalCount) for each campaign
-- **Exposes a REST API** on standard HTTP endpoints
-- **Runs concurrency-safe** using Go's `sync.Mutex`.
+- **Campaign Management**: Register and manage advertising campaigns.
+- **Impression Tracking**: Log unique ad impressions while avoiding duplicates using a TTL mechanism.
+- **Statistics Reporting**: Retrieve impression counts for the last hour, last day, and total impressions.
+- **REST API Exposure**: Standard HTTP endpoints for campaign management and analytics.
+- **Thread-Safe Concurrency**: Ensures safe concurrent operations using Go's `sync.Mutex`.
 
 ---
 
 ## Features
 
-1. **Campaign Management**
-    - Create a new campaign with `name` and `start_time`.
-    - Persists the campaign in memory using a `Server` struct.
-2. **Impression Tracking**
-    - Tracks user impressions by `campaign_id`, `user_id`, and `ad_id`.
-    - Uses a TTL (1 hour) to avoid counting **duplicate** impressions from the same user.
-3. **Campaign Stats**
-    - Retrieves aggregated stats for a given campaign.
-    - Stats include impressions in the **Last Hour**, **Last Day**, and **Total**.
-4. **API Endpoints**
-    - `POST /api/v1/campaigns` — Create a campaign
-        - Request Body: `{"name": "string", "start_time": "RFC3339 Time"}`
-    - `POST /api/v1/impressions` — Track an impression
-        - Request Body: `{"campaign_id": "string", "user_id": "string", "ad_id": "string"}`
-    - `GET /api/v1/campaigns/{id}/stats` — Get stats by campaign ID
-    - `404` handler for invalid routes
-5. **Concurrent & Thread-Safe**
-    - Uses `sync.Mutex` to lock shared resources.
-6. **Test Coverage**
-    - Includes an extensive suite of unit tests under `internal/handlers/tests`.
+### **1. Campaign Management**
+
+- Create campaigns with a `name` and `start_time`.
+- Persist campaigns in-memory.
+
+### **2. Impression Tracking**
+
+- Log user impressions for a given `campaign_id`, `user_id`, and `ad_id`.
+- Prevent duplicate impressions within a **1-hour TTL** window.
+
+### **3. Campaign Statistics**
+
+- Retrieve aggregated impression stats.
+- Supported statistics:
+   - **Last Hour**
+   - **Last Day**
+   - **Total Count**
+
+### **4. API Endpoints**
+
+- `POST /api/v1/campaigns` — Create a campaign
+- `POST /api/v1/impressions` — Track an impression
+- `GET /api/v1/campaigns/{id}/stats` — Get campaign stats
+- `404` handling for invalid routes
+
+### **5. Concurrent & Thread-Safe**
+
+- Uses `sync.Mutex` to prevent race conditions on shared data.
+
+### **6. Test Coverage**
+
+- Includes a comprehensive test suite under `internal/repositories/memory/tests`.
 
 ---
 
@@ -41,55 +52,69 @@ This repository contains an **in-memory concurrent service** for tracking ad imp
 ```
 .
 ├── cmd
-│   └── server
-│       ├── config.go           # Configuration logic (if any)
-│       └── main.go             # Entry point for running the service
-├── docker-compose.yml          # Docker Compose setup
-├── Dockerfile                  # Docker build file
+│   ├── config
+│   │   └── config.go           # Configuration management
+│   └── server
+│       └── main.go             # Service entry point
+├── config.yml                   # Configuration file
+├── docker-compose.yml            # Docker Compose setup
+├── Dockerfile                    # Docker build instructions
 ├── go.mod
 ├── go.sum
 ├── internal
-│   ├── handlers
-│   │   ├── campaign.go         # Create campaign handler
-│   │   ├── impression.go       # Track impression handler
-│   │   ├── notFound.go         # NotFoundHandler for invalid routes
-│   │   ├── server.go           # Defines Server struct, shared concurrency-safe maps
-│   │   ├── stats.go            # Get campaign stats handler
-│   │   └── tests
-│   │       ├── campaign_test.go
-│   │       ├── config_test.go
-│   │       ├── high_volume_test.go
-│   │       ├── impression_test.go
-│   │       ├── main_test.go
-│   │       ├── not_found_test.go
-│   │       ├── server_test.go
-│   │       └── stats_test.go
-│   └── logger
-│       └── logger.go           # Custom logger logic
-└── main.go                     # (Optional) top-level main, or empty if using cmd/server
+│   ├── entities
+│   │   ├── campaign.go         # Campaign model
+│   │   ├── impression.go       # Impression model
+│   │   ├── server.go           # Server struct with concurrent maps
+│   │   └── stats.go            # Stats model
+│   ├── handlers
+│   │   ├── campaign.go         # Campaign HTTP handlers
+│   │   ├── impression.go       # Impression HTTP handlers
+│   │   ├── notFound.go         # 404 error handler
+│   │   ├── server.go           # Server initialization
+│   │   └── stats.go            # Stats handler
+│   ├── logger
+│   │   └── logger.go           # Custom logging utilities
+│   ├── repositories
+│   │   ├── campaign_repository.go  # Campaign repository interface
+│   │   ├── impression_repository.go # Impression repository interface
+│   │   ├── memory
+│   │   │   ├── campaign.go     # In-memory campaign storage
+│   │   │   ├── impression.go   # In-memory impression storage
+│   │   │   ├── initiate.go     # Initialization logic
+│   │   │   ├── stats.go        # In-memory stats calculation
+│   │   │   └── tests
+│   │   │       ├── campaign_test.go
+│   │   │       ├── config.yml
+│   │   │       ├── high_volume_test.go
+│   │   │       ├── impression_test.go
+│   │   │       ├── not_found_test.go
+│   │   │       ├── stats_test.go
+│   │   │       └── utils.go
+│   │   └── stats_repository.go # Stats repository interface
+│   ├── utils
+│   │   └── response.go         # API response helpers
+│   └── validators
+│       ├── campaign.go         # Campaign validation logic
+│       ├── impression.go       # Impression validation logic
+│       ├── stats.go            # Stats validation logic
+│       └── validate.go         # Generic validation utilities
+├── main.go                     # (Optional) Service entry point
+└── README.md
 ```
-
-### Key Components
-
-- ``: Minimal entry point that sets up and starts the HTTP server.
-- ``: Business logic for creating campaigns, tracking impressions, retrieving stats, and handling 404s.
-- ``: Defines the `Server` struct, storing concurrency-safe maps for campaigns, impressions, and stats.
-- ``: Logging utilities.
-- ``** & **``: For containerization if desired.
-- ``: Houses the test files for campaigns, impressions, stats, concurrency, etc.
 
 ---
 
 ## Getting Started
 
-### Prerequisites
+### **Prerequisites**
 
 - [Go 1.18+](https://golang.org/dl/)
 - (Optional) [Docker](https://docs.docker.com/get-docker/) & [Docker Compose](https://docs.docker.com/compose/install/)
 
-### Installation
+### **Installation**
 
-1. **Clone** this repository:
+1. **Clone** the repository:
 
 ```bash
 git clone https://github.com/yourusername/ad-impression-service.git
@@ -102,36 +127,33 @@ cd ad-impression-service
 go mod download
 ```
 
-### Running Locally
+### **Running Locally**
 
-#### Via Go:
+#### **Using Go:**
 
 ```bash
-go run ./cmd/server
+go run ./cmd/server/main.go
 ```
 
-The server starts on `:8080`. You should see:
+The server will start on `:8080` with output:
 
 ```
 Server started on :8080
 ```
 
-#### Via Docker Compose:
+#### **Using Docker Compose:**
 
-1. Make sure Docker is running.
-2. Run:
-   ```bash
-   docker-compose up --build
-   ```
-3. The service will be available on `:8080` (or whichever port configured in `docker-compose.yml`).
+```bash
+docker-compose up --build
+```
+
+The service will be available at `:8080`.
 
 ---
 
 ## Usage
 
-Below are sample requests for each endpoint. You can use [curl](https://curl.se/) or a tool like [Postman](https://www.postman.com/).
-
-### 1. Create a Campaign
+### **1. Create a Campaign**
 
 ```bash
 curl -X POST \
@@ -143,7 +165,7 @@ curl -X POST \
 }'
 ```
 
-#### Example Response
+**Response:**
 
 ```json
 {
@@ -153,7 +175,7 @@ curl -X POST \
 }
 ```
 
-### 2. Track an Impression
+### **2. Track an Impression**
 
 ```bash
 curl -X POST \
@@ -166,19 +188,19 @@ curl -X POST \
 }'
 ```
 
-#### Example Response
+**Response:**
 
 ```json
 { "message": "Impression saved successfully" }
 ```
 
-### 3. Get Campaign Stats
+### **3. Get Campaign Stats**
 
 ```bash
-curl -X GET http://localhost:8080/api/v1/campaigns/some-uuid-value
+curl -X GET http://localhost:8080/api/v1/campaigns/some-uuid-value/stats
 ```
 
-#### Example Response
+**Response:**
 
 ```json
 {
@@ -189,13 +211,11 @@ curl -X GET http://localhost:8080/api/v1/campaigns/some-uuid-value
 }
 ```
 
-### 4. Unknown Routes
-
-Any route not registered returns `404 not found`.
-
 ---
 
 ## Testing
+
+Run tests:
 
 ```bash
 go test -coverprofile=coverage.out ./...
@@ -207,7 +227,7 @@ Check coverage:
 go tool cover -func=coverage.out
 ```
 
-Generate an HTML report:
+Generate an HTML coverage report:
 
 ```bash
 go tool cover -html=coverage.out -o coverage.html
@@ -223,5 +243,3 @@ open coverage.html
 3. **Commit** your changes: `git commit -m 'Add some feature'`
 4. **Push** to the branch: `git push origin feature/new-feature`
 5. **Open** a Pull Request.
-
-
